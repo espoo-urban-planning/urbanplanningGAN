@@ -1,0 +1,687 @@
+<!--
+  Copyright (c) 2018 ml5
+
+  This software is released under the MIT License.
+  https://opensource.org/licenses/MIT
+-->
+
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+
+
+  <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css">
+  <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.2/leaflet.draw.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.2/leaflet.draw.js"></script>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-easybutton@2/src/easy-button.css">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-easybutton@2/src/easy-button.js"></script>
+
+  <script src='leaflet-image.js'></script>
+  <style>
+    #map {
+      height: 100%;
+      width: 100%;
+      z-index: 100;
+    }
+
+    .star {
+      font-size: 2em;
+    }
+
+    /*#test img {
+      height: 512px;
+      width: 512px;
+      position: absolute;
+      top: 0px;
+      z-index:10001;
+    }
+    */
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/addons/p5.dom.min.js"></script>
+  <script src="ml5_pix2pix_512_hack.min.js" type="text/javascript"></script>
+
+  <script src="url.js"></script>
+  <script src="jquery.js"></script>
+  <script src="two.js"></script>
+
+  <script>
+        /*$(document).on('click', function (event) {
+            console.log("dragstart")
+        });*/
+
+        function hideAnchors() {
+          $('path[id^="two_"]').hide()
+        }
+        function showAnchors() {
+          $('path[id^="two_"]').show()
+        }
+
+        $(function() {
+          L_PREFER_CANVAS = true;
+            terrain_roads = L.tileLayer('DarkTiles/{z}/{x}/{y}.png', {maxZoom:15, detectRetina:true});
+          terrain_roads_residential = L.tileLayer('EerosTestMap3_combined/{z}/{x}/{y}.png', {maxZoom:15, detectRetina:true});
+
+          map = L.map('map', {
+              center: [60.1841, 24.8301],
+              zoom: 14,
+              preferCanvas: true,
+              renderer: L.Canvas 
+          });
+          map__ = map
+
+          /*
+          $(document).on('click', function(e) {        
+            $("#output img").css('z-index', -100000);     
+          });
+          */
+
+
+          map.addLayer(terrain_roads);
+          map.addLayer(terrain_roads_residential);
+
+          drawnItems = L.featureGroup().addTo(map);
+          generatedItems = L.featureGroup().addTo(map);
+
+          map.addControl(new L.Control.Draw({
+              edit: {
+                  featureGroup: drawnItems,
+                  /* This nesting is really weird 
+                  but needed for Leaflet.drawtfor some reason (bug?) */
+
+                  edit: {
+                    selectedPathOptions: {
+                      dashArray: '10, 10',
+
+                      fill: true,
+                      fillColor: '#ff0000',
+                      fillOpacity: 1,
+
+                      // Whether to user the existing layers color
+                      maintainColor: false
+                    }
+                  }
+                  /*
+                  selectedPathOptions: {
+                    maintainColor: true,
+                    opacity: 0.7,
+                    fillColor: 'red',
+                    shapeOptions: {
+                      color: '#ff0000',
+                      stroke: true,
+                      strokeOpacity: 1,
+                      fillOpacity: 1,
+                      opacity: 1
+                    }
+                  }*/,
+                  poly: {
+                      allowIntersection: false
+                  }
+              },
+              draw: {
+                  marker: false,
+                  rectangle: false,
+                  circle: false,
+                  polyline: {
+                    shapeOptions: {
+                      color: '#0000FF',
+                      stroke: true,
+                      strokeOpacity: 1,
+                      fillOpacity: 1,
+                      opacity: 1,
+                      weight: 2
+                    },
+                  },
+                  polygon: {
+                      allowIntersection: false,
+                      showArea: true,
+                      shapeOptions: {
+                          fill: true,
+                          fillColor: "#ff0000",
+                          fillOpacity: 1,
+                          color: 'transparent',
+                          weight: 0,
+                          weight: 2,
+                          stroke: false
+                      }
+                  }
+              }
+          }));
+
+          map.on(L.Draw.Event.CREATED, function (event) {
+              var layer = event.layer;
+
+              drawnItems.addLayer(layer);
+          });
+
+          map.on(L.Draw.Event.EDITSTART, function (event) {
+              $(".leaflet-image-layer").css("z-index", -1)
+          });
+
+          map.on(L.Draw.Event.DELETESTART, function (event) {
+              $(".leaflet-image-layer").css("z-index", -1)
+          });
+
+          map.on(L.Draw.Event.DELETESTOP, function (event) {
+              $(".leaflet-image-layer").css("z-index", 'initial')
+          });
+
+          map.on(L.Draw.Event.EDITSTOP, function (event) {
+              $(".leaflet-image-layer").css("z-index", 'initial')
+          });          
+
+
+
+          map__ = map
+
+
+          function extract(final = false) {
+            
+            svgs = $("svg path[fill='#ff0000']")
+            if(svgs.length == 0)
+              return;
+
+            rects = svgs[0].getClientRects()[0];
+            console.log(rects)
+
+            xPadding = (512 - rects.width)/2;
+            yPadding = (512 - rects.height)/2;
+            xStart = rects.left - xPadding;
+            xOffset = 0;
+            if(xStart < 0)
+              //xOffset = xStart;
+              xStart = 0;
+            yStart = rects.top - yPadding;
+            yOffset = 0;
+            if(yStart < 0)
+              //yOffset = yStart;
+              yStart = 0;
+
+
+            xEnd = xStart + 512;
+            yEnd = yStart + 512;
+
+            leftTopLatLng = map__.containerPointToLatLng([xStart, yStart])
+            rightBottomLatLng = map__.containerPointToLatLng([xEnd, yEnd])
+            
+            //temp = map__._pathroot;
+            //map__._pathroot = null;
+
+            //map__.removeLayer(drawnItems)
+            map__.removeLayer(terrain_roads_residential);
+            if(final)
+              map__.removeLayer(terrain_roads);
+            else {
+              generatedItems.eachLayer(
+                function(l){
+                    generatedItems.removeLayer(l);
+              });
+            }
+            //map__.removeLayer(generatedItems);
+
+            leafletImage(map__, function(err, canvas) {
+                tc = document.createElement('canvas'), // Not shown on page
+                tc.width = 512
+                tc.height = 512
+                var tcCtx = tc.getContext('2d');
+                var ctx = canvas.getContext('2d');
+
+                if(!final) {
+                  var imagedata = ctx.getImageData(xStart, yStart, xEnd, yEnd);
+                  tcCtx.putImageData(imagedata,0,0);
+                }
+
+                /*
+                loader   = new Image;                        // Not shown on page
+                loader.width = 2000;
+                loader.height = 1006;
+                var svgAsXML = (new XMLSerializer).serializeToString( svgs[0] );
+                loader.src = 'data:image/svg+xml,' + encodeURIComponent( svgAsXML );
+                tc2 = document.createElement('canvas'); // Not shown on page
+                */
+                
+                //console.log(xml)
+
+                loader   = new Image;                        // Not shown on page
+                loader.width = rects.width;
+                loader.height = rects.height;
+
+                _loader = loader
+
+                mySvg = document.querySelector('svg')
+                ssr = mySvg.getClientRects()[0]
+                spr = rects
+
+                loader.onload = function(){
+                  console.log("loads")
+                  if(final) {
+                    previous = $("img.leaflet-image-layer")[0]
+                    tcCtx.drawImage( previous, 0, 0, 512, 512 );
+                  }
+                  tcCtx.drawImage( loader, 0, 0, ssr.width, ssr.height );
+                  //ctx.drawImage( document.querySelector('#bgContainer img'), 0, 0, 512, 512);
+                  /*ctx.drawImage( loader, 0, 0, loader.width, loader.height );
+                  ctx.drawImage( document.querySelector('#canvasContainer canvas'), 0, 0, 512, 512);
+                  tgtImage.src = can.toDataURL();
+                  setTimeout(function(){ transfer(select('#tempImage').elt); }, 150);
+                  */
+                  // example thing to do with that canvas:
+                  var img = document.createElement('img');
+                  //var dimensions = map__.getSize();
+                  img.width = 512;
+                  img.height = 512;
+                  //alert(img.width, img.height)
+                  img.src = tc.toDataURL()
+                  img.style.left = xStart+"px";
+                  img.style.top = yStart+"px";
+                  img.style.position = "absolute"
+                  img.style.zIndex = -1001
+
+                  console.log($("svg path").length)
+
+                  document.getElementById('test').innerHTML = '';
+                  document.getElementById('test').appendChild(img);
+
+                  if(final) {
+                    setTimeout(function(){ 
+                      cityEngine( tc.toDataURL() ); 
+                    }, 150);
+                  }
+                  else {
+                    setTimeout(function(){ transfer(img, function(resImg) {
+                        //L.marker(leftTopLatLng).addTo(map__);
+                        //L.marker(rightBottomLatLng).addTo(map__);
+
+                        //resImg.style.left = xStart+"px";
+                        //resImg.style.top = yStart+"px";
+                        //resImg.zIndex = -10000000;
+                        //resImg.draggable = false;
+
+                        iol = L.imageOverlay(resImg.src, [leftTopLatLng, rightBottomLatLng], {
+                          interactive: false
+                        });
+                        generatedItems.addLayer(iol);
+                    }); }, 150);
+                  }
+                };
+
+                
+                var svgAsXML = (new XMLSerializer).serializeToString( mySvg );
+
+                svgAsXML = svgAsXML.replace(/style="transform[^\"]*"/,'')
+                document.getElementById('test').innerHTML = '';
+                document.getElementById('test').appendChild(loader);
+
+                
+                
+               // document.getElementById('test').innerHTML = '';
+                //document.getElementById('test').appendChild(loader);
+
+                //_r = loader.getClientRects();
+                
+                // ssr is svg rect
+                // spr is path rect
+
+
+                _w = rects.width
+                _h = rects.height
+
+                transformX = (ssr.x - spr.x) + (512 - rects.width) / 2 + xOffset;
+                transformY = (ssr.y - spr.y) + (512 - rects.height) / 2 + yOffset;
+
+                pathXML = '';
+               path = svgs[0].cloneNode(); 
+                path.setAttribute('fill', 'transparent'); 
+                path.setAttribute('stroke', '#0000ff'); 
+                path.setAttribute('stroke-width', 2); 
+                path.setAttribute('style', 'mix-blend-mode: screen;'); 
+                path.setAttribute('transform', 'translate(' + transformX + ',' + transformY + ')'); 
+                pathXML = (new XMLSerializer).serializeToString( path );
+                pathXML = '<g>' + pathXML + '</g>';
+
+                if(final) {
+                  svgAsXML = svgAsXML.replace(/<path/g, '<path transform="translate(' + transformX + ',' + transformY + ')" ')
+                  //svgAsXML = svgAsXML.replace(/<path fill-rule/, )
+                  svgAsXML = svgAsXML.replace(/fill=".*?"/g, 'fill="transparent"')
+                  svgAsXML = svgAsXML.replace(/stroke=".*?"/g, 'stroke="#0000ff"')
+                }
+                else {
+                  svgAsXML = svgAsXML.replace(/<path/g, '<path transform="translate(' + transformX + ',' + transformY + ')" ')
+                  svgAsXML = svgAsXML.replace(/<\/svg/g, pathXML + '<\/svg')
+                }
+
+                
+
+                
+
+                console.log(svgAsXML)
+
+                loader.src = 'data:image/svg+xml,' + encodeURIComponent( svgAsXML );
+
+                //a.setAttribute('transform','translate(' + (transformX+10) + ',' + (transformY+10) + ')');
+                
+
+                /*
+                tc2.width = 2000;
+                tc2.height = 1006;
+                var tcCtx2 = tc.getContext('2d');
+                tcCtx2.drawImage(loader, 0, 0, 2000, 1006)
+
+
+                // now you have canvas
+                // example thing to do with that canvas:
+                var img = document.createElement('img');
+                //var dimensions = map__.getSize();
+                img.width = 2000;
+                img.height = 1006;
+                //alert(img.width, img.height)
+                img.src = tc2.toDataURL()
+                img.style.left = xStart+"px";
+                img.style.top = yStart+"px";
+
+                console.log($("svg path").length)
+
+                document.getElementById('test').innerHTML = '';
+                document.getElementById('test').appendChild(img);
+                */
+
+                map__.addLayer(terrain_roads_residential);
+                //map__.removeLayer(generatedItems);
+            });
+          }
+
+          b = L.easyButton( '<span class="star">&easter;</span>', function() {
+            extract(false);
+          });
+
+          b.addTo(map);
+
+          c = L.easyButton( '<span style="font-size: 1.5em;">c</span>', function(){
+            extract(true);
+          });
+          c.addTo(map);
+
+            var $window = $(window);
+            var radius = 10, editColor = 'rgb(79, 128, 255)';
+            var type = /(canvas|webgl)/.test(url.type) ? url.type : 'svg';
+            two = new Two({
+                type: Two.Types[type],
+                fullscreen: false,
+                autostart: true,
+                width: 512,
+                height: 512
+              }).appendTo(document.querySelector('#tempImageContainer'));
+
+/*
+            letter = two.interpret(document.querySelector('.assets svg'));
+
+            letter.linewidth = radius;
+            letter.cap = letter.join = 'round';
+            letter.stroke = 'none';
+            letter.fill = 'red';
+            letter.curved = false;
+            letter.scale = 1;
+
+
+            var resize = function() {
+              var cx = two.width / 2;
+              var cy = two.height / 2;
+              var rect = letter.getBoundingClientRect();
+              letter.translation.set(cx - rect.width / 2, cy - rect.height / 2);
+            };
+            two.bind('resize', resize);
+            resize();
+
+            _.each(letter.children, function(polygon) {
+              _.each(polygon.vertices, function(anchor) {
+
+                var p = two.makeCircle(0, 0, radius / 4);
+                var l = two.makeCircle(0, 0, radius / 4);
+                var r = two.makeCircle(0, 0, radius / 4);
+
+                p.translation.copy(anchor);
+                
+                p.noStroke().fill = l.noStroke().fill = r.noStroke().fill = editColor;
+                l.fill = r.fill = 'none';
+
+                var ll = new Two.Path([
+                  new Two.Anchor().copy(p.translation),
+                  new Two.Anchor().copy(l.translation)
+                ], false, false);
+                var rl = new Two.Path([
+                  new Two.Anchor().copy(p.translation),
+                  new Two.Anchor().copy(r.translation)
+                ], false, false);
+
+                rl.noFill().stroke = ll.noFill().stroke = editColor;
+
+                letter.add(p);
+
+                p.translation.bind(Two.Events.change, function() {
+                  anchor.copy(this);
+                  l.translation.copy(anchor.controls.left).addSelf(this);
+                  r.translation.copy(anchor.controls.right).addSelf(this);
+                  ll.vertices[0].copy(this);
+                  rl.vertices[0].copy(this);
+                  ll.vertices[1].copy(l.translation);
+                  rl.vertices[1].copy(r.translation);
+                });
+                l.translation.bind(Two.Events.change, function() {
+                  anchor.controls.left.copy(this).subSelf(anchor);
+                  ll.vertices[1].copy(this);
+                });
+                r.translation.bind(Two.Events.change, function() {
+                  anchor.controls.right.copy(this).subSelf(anchor);
+                  rl.vertices[1].copy(this);
+                });
+
+                two.update();
+
+                addInteractivity(p);
+              });
+
+            });
+
+            function addInteractivity(shape) {
+
+              var offset = shape.parent.translation;
+
+              var drag = function(e) {
+                e.preventDefault();
+                var x = e.clientX - offset.x;
+                var y = e.clientY - offset.y;
+                shape.translation.set(x, y);
+              };
+              var touchDrag = function(e) {
+                e.preventDefault();
+                var touch = e.originalEvent.changedTouches[0];
+                drag({
+                  preventDefault: _.identity,
+                  clientX: touch.pageX,
+                  clientY: touch.pageY
+                });
+                return false;
+              };
+              var dragEnd = function(e) {
+                e.preventDefault();
+                //tsvg();
+                $window
+                  .unbind('mousemove', drag)
+                  .unbind('mouseup', dragEnd);
+              };
+              var touchEnd = function(e) {
+                e.preventDefault();
+                //tsvg();
+                $(window)
+                  .unbind('touchmove', touchDrag)
+                  .unbind('touchend', touchEnd);
+                return false;
+              };
+
+              shape._renderer.elem.className = 'vertexHandle';
+              $(shape._renderer.elem)
+                .css({
+                  cursor: 'pointer'
+                })
+                .bind('mousedown', function(e) {
+                  e.preventDefault();
+                  $window
+                    .bind('mousemove', drag)
+                    .bind('mouseup', dragEnd);
+                })
+                .bind('touchstart', function(e) {
+                  e.preventDefault();
+                  $(window)
+                    .bind('touchmove', touchDrag)
+                    .bind('touchend', touchEnd);
+                  return false;
+                });
+
+            }
+
+          });
+
+          function addBackdrop(d) {
+
+            var dimensions = d || 50;
+            var two = new Two({
+              type: Two.Types.canvas,
+              width: dimensions,
+              height: dimensions
+            });
+
+            var r = dimensions / 10;
+            var center = dimensions / 2;
+
+            var a = two.makeLine(center - r, center, center + r, center);
+            var b = two.makeLine(center, center - r, center, center + r);
+
+            a.stroke = b.stroke = '#aaa';
+            a.linewidth = b.linewidth = 0.25;
+
+            two.update();
+
+            _.extend(document.body.style, {
+              backgroundImage: 'url(' + two.renderer.domElement.toDataURL() + ')',
+              backgroundRepeat: 'repeat',
+              backgroundSize: dimensions + 'px ' + dimensions + 'px'
+            });
+
+            */
+        })
+      </script>
+
+
+  <style> 
+    canvas, img {
+      image-rendering: pixelated;
+    }
+    .border-box {
+      /*border: black 1px solid;*/
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .flex-space-between {
+      justify-content: space-between;
+    }
+
+    button, button:focus {
+      outline: none;
+    }
+
+    /*
+    #output {
+      position: absolute;
+      left: 512px;
+      top: 0px;
+    }*/
+
+    #output_ce {
+      position: absolute;
+      left: 512px;
+      top: 0px;
+    }
+
+
+    #output img {
+      position: absolute;
+      z-index: 100000;
+      /*
+      left: -512px;
+      */
+      width: 512px;
+      height: 512px;
+    }
+
+    svg {
+      opacity: 0.8;
+    }
+
+    #output p {
+      padding: 20px;
+    }
+
+    #downloadBtn a, a:hover {
+      text-decoration: none;
+      color: initial;
+    }
+
+    button.selected {
+        background: #e2e2e2;
+        -webkit-box-shadow: inset 0px 0px 5px #c1c1c1;
+           -moz-box-shadow: inset 0px 0px 5px #c1c1c1;
+                box-shadow: inset 0px 0px 5px #c1c1c1;
+         outline: none;
+    }
+  </style>
+</head>
+
+<body style="background: #eee; margin: 0; padding: 0;">
+  <div id="map"></div>
+  
+ <!-- <div class="assets">
+      <svg version="1.1" style="display: none"
+         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:a="http://ns.adobe.com/AdobeSVGViewerExtensions/3.0/"
+         x="0px" y="0px" width="170px" height="222px" viewBox="-0.469 -0.136 202 264"
+         overflow="visible" enable-background="new -0.469 -0.136 202 264" xml:space="preserve">
+        <path id="svg_2" d="m31.88236,128.727946c0,0 75.882355,-67.058825 75.764699,-67.551475c0.117656,0.49265 75.411776,72.845593 75.411776,72.845593c0,0 -37.64706,39.411766 -37.058825,40.000001c0.588235,0.588235 -74.117649,7.058824 -74.235304,6.566171c0.117655,0.492653 -39.882346,-51.86029 -39.882346,-51.86029z" fill-opacity="null" stroke-opacity="null" stroke-width="null" stroke="#000000" fill="none"/>
+    </div>
+
+-->
+  <div id="test"></div>
+  <div class="flex">
+    <div>
+      <div id="tempImageContainer">
+        <img id="tempImage" width="512" height="512" style="display: none; position: absolute; right: 0px; bottom: 0px;"/></div>
+      <div id="bgContainer" style="position: absolute; top:0px; left:0px; z-index: -2;"><img src="images/v2-512.png"/></div>
+      <div id="canvasContainer" style="position: absolute; top:0px; left:0px; z-index: -1;"></div>
+      <div id="transferContainer"></div>
+      <div id="output">  <p id="status">Ladataan neuroverkkoa... odota</p></div>
+      <div id="output_ce"></div>
+      <div id="btnContainer" style="margin-top: 5px; margin-left: 5px;" class="flex flex-space-between">
+        <button id="imagineBtn" style="margin-right: 11px">Aja neuroverkko</button><br>
+        <button id="editZoningBtn" class="selected">Muokkaa aluetta</button><br>
+        <button id="drawRoadsBtn">Piirrä katuja</button><br>
+        <button id="clearBtn">Tyhjennä</button><br>
+
+        <button style="opacity: 0; position: absolute; right: 3%;" id="downloadBtn">Vie CityEngineen</button><br>
+      </div>
+    </div>
+    
+    
+  </div>
+
+  <script src="sketch.js"></script>
+</body>
+
+</html>

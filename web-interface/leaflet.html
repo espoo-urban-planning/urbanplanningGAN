@@ -1,0 +1,84 @@
+<html>  
+  <head>
+    <title>David's Map</title>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css">
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.2/leaflet.draw.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.2/leaflet.draw.js"></script>
+
+
+    <script src='//api.tiles.mapbox.com/mapbox.js/plugins/leaflet-image/v0.0.4/leaflet-image.js'></script>
+    <style>
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="images"></div>
+    <script>
+      var terrain_roads = L.tileLayer('EerosTestMap3_base/{z}/{x}/{y}.png', {maxZoom:15, detectRetina:true});
+      var terrain_roads_residential = L.tileLayer('EerosTestMap3_combined/{z}/{x}/{y}.png', {maxZoom:15, detectRetina:true});
+
+      var map = L.map('map', {
+          center: [60.1699, 24.9384],
+          zoom: 14,
+          preferCanvas: true
+      });
+
+      map.addLayer(terrain_roads);
+      map.addLayer(terrain_roads_residential);
+
+      drawnItems = L.featureGroup().addTo(map);
+
+      map.addControl(new L.Control.Draw({
+          edit: {
+              featureGroup: drawnItems,
+              poly: {
+                  allowIntersection: false
+              }
+          },
+          draw: {
+              marker: false,
+              rectangle: false,
+              circle: false,
+              polygon: {
+                  allowIntersection: false,
+                  showArea: true
+              }
+          }
+      }));
+
+      map.on(L.Draw.Event.CREATED, function (event) {
+          var layer = event.layer;
+
+          drawnItems.addLayer(layer);
+      });
+
+
+
+      function test() {
+        map.removeLayer(terrain_roads_residential);
+        leafletImage(map, function(err, canvas) {
+            // now you have canvas
+            // example thing to do with that canvas:
+            var img = document.createElement('img');
+            var dimensions = map.getSize();
+            img.width = dimensions.x;
+            img.height = dimensions.y;
+            //alert(img.width, img.height)
+            img.src = canvas.toDataURL();
+
+            console.log($("svg path").length)
+
+            document.getElementById('images').innerHTML = '';
+            document.getElementById('images').appendChild(img);
+        });
+        map.addLayer(terrain_roads_residential);
+      }
+
+    </script>
+  </body>
+</html>  

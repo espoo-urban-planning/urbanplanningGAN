@@ -1,0 +1,4 @@
+while true; do
+	cliclick c:1210,180
+    sleep 60 # or more, or less
+done

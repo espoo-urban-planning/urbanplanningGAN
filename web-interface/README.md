@@ -1,0 +1,1 @@
+Interaktiivinen GAN-verkko, joka on koulutettu generoimaan asuinaluiden katuverkkoa olemassaolevan tierakenteen kontekstissa.
